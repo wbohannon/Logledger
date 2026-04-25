@@ -1,0 +1,45 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Client {
+  id             String    @id @default(cuid())
+  name           String
+  hourlyRate     Float
+  jiraProjectKey String?
+  billingEmail   String?
+  createdAt      DateTime  @default(now())
+  invoices       Invoice[]
+}
+
+model Invoice {
+  id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  startDate   DateTime
+  endDate     DateTime
+  totalHours  Float
+  totalAmount Float
+  status      String   @default("draft") // draft, sent, paid
+  createdAt   DateTime @default(now())
+  lineItems   InvoiceLineItem[]
+}
+
+model InvoiceLineItem {
+  id                 String   @id @default(cuid())
+  invoiceId          String
+  invoice            Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  epicTitle          String?
+  issueKey           String
+  summary            String
+  worklogDescription String?
+  hours              Float
+  rate               Float
+  amount             Float
+}
