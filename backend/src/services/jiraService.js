@@ -159,7 +159,7 @@ async function markIssueExported(issueKey) {
   const url = `${baseUrl}/rest/api/3/issue/${issueKey}`;
   await axios.put(
     url,
-    { fields: { [fieldId]: 'Yes' } },
+    { fields: { [fieldId]: { value: 'Yes' } } },
     { headers: { ...getAuthHeader(), 'Content-Type': 'application/json', Accept: 'application/json' } }
   );
 }
