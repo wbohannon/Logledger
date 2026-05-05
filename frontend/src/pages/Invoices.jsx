@@ -6,6 +6,7 @@ export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [updatingInvoiceId, setUpdatingInvoiceId] = useState('');
   const [filterClient, setFilterClient] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
 
@@ -22,6 +23,18 @@ export default function Invoices() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [filterClient, filterStatus]);
+
+  const updateInvoiceStatus = async (invoiceId, status) => {
+    setUpdatingInvoiceId(invoiceId);
+    try {
+      const updated = await api.invoices.updateStatus(invoiceId, status);
+      setInvoices((prev) => prev.map((inv) => (inv.id === invoiceId ? { ...inv, status: updated.status } : inv)));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setUpdatingInvoiceId('');
+    }
+  };
 
   if (loading) return <div className="page-header"><p>Loading…</p></div>;
 
@@ -80,7 +93,18 @@ export default function Invoices() {
                   </td>
                   <td>{inv.totalHours}</td>
                   <td>${Number(inv.totalAmount).toFixed(2)}</td>
-                  <td><span className={`badge badge-${inv.status}`}>{inv.status}</span></td>
+                  <td>
+                    <select
+                      value={inv.status}
+                      onChange={(e) => updateInvoiceStatus(inv.id, e.target.value)}
+                      disabled={updatingInvoiceId === inv.id}
+                      aria-label={`Change status for invoice ${inv.id}`}
+                    >
+                      <option value="draft">Draft</option>
+                      <option value="sent">Sent</option>
+                      <option value="paid">Paid</option>
+                    </select>
+                  </td>
                   <td>
                     <Link to={`/invoices/${inv.id}`}>View</Link>
                     {' · '}
