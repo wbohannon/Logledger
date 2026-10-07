@@ -18,10 +18,10 @@ COPY --from=frontend /build/dist ./frontend/dist
 RUN npx prisma generate
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=3004
 
 # SQLite DB path (use volume mount at /app/data)
 ENV DATABASE_URL="file:/app/data/sqlite.db"
 
-EXPOSE 3000
+EXPOSE 3004
 CMD ["node", "src/index.js"]
