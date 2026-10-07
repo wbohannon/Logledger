@@ -51,4 +51,9 @@ const sendEmail = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
-module.exports = { list, get, preview, generate, downloadPdf, updateStatus, sendEmail };
+const emailContent = asyncHandler(async (req, res) => {
+  const content = await invoiceService.getEmailContent(req.params.id);
+  res.json(content);
+});
+
+module.exports = { list, get, preview, generate, downloadPdf, updateStatus, sendEmail, emailContent };

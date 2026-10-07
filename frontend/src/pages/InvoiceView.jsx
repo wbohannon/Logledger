@@ -28,11 +28,20 @@ export default function InvoiceView() {
     }
   };
 
+  // Downloads the PDF, then opens a new message in the default mail app with recipients, subject and body filled in.
+  // Browsers can't attach files to a mailto: message, so the PDF is dragged in from Downloads.
   const sendInvoiceEmail = async () => {
     setSending(true);
     try {
-      const result = await api.invoices.sendEmail(id);
-      alert(`Invoice sent to ${result.to?.join(', ') || 'recipients'}.`);
+      const { to, subject, body } = await api.invoices.emailContent(id);
+      const link = document.createElement('a');
+      link.href = api.invoices.pdfUrl(id);
+      link.download = '';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      const mailto = `mailto:${to.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      setTimeout(() => { window.location.href = mailto; }, 500);
     } catch (e) {
       alert(e.message);
     } finally {
@@ -69,7 +78,7 @@ export default function InvoiceView() {
             disabled={sending || !invoice.client?.billingEmail?.trim()}
             title={!invoice.client?.billingEmail?.trim() ? 'Add billing emails in Clients' : ''}
           >
-            {sending ? 'Sending…' : 'Email invoice'}
+            {sending ? 'Opening…' : 'Email invoice'}
           </button>
           <Link to="/invoices" className="btn btn-secondary">Back to list</Link>
         </div>

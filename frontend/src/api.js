@@ -32,6 +32,7 @@ export const api = {
     generate: (body) => request('/invoices/generate', { method: 'POST', body: JSON.stringify(body) }),
     pdfUrl: (id) => `${API_BASE}/api/invoices/${id}/pdf`,
     sendEmail: (id) => request(`/invoices/${id}/send`, { method: 'POST' }),
+    emailContent: (id) => request(`/invoices/${id}/email`),
     updateStatus: (id, status) =>
       request(`/invoices/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   },

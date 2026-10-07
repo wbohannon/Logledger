@@ -39,6 +39,9 @@ export default function GenerateInvoice() {
     setError('');
     try {
       const invoice = await api.invoices.generate({ clientId });
+      if (invoice.jiraExportFailures?.length) {
+        alert(`Invoice created, but these Jira issues could not be marked as exported: ${invoice.jiraExportFailures.join(', ')}`);
+      }
       window.location.href = `/invoices/${invoice.id}`;
     } catch (e) {
       setError(e.message);

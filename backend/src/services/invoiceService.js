@@ -129,15 +129,26 @@ async function generateInvoice(clientId) {
     include: { client: true, lineItems: true },
   });
 
-  for (const issue of issues) {
+  const jiraExportFailures = await markIssuesExported(issues.map((issue) => issue.key));
+
+  return { ...invoice, jiraExportFailures };
+}
+
+/**
+ * Set "time exported" = Yes on each Jira issue. Returns the keys that failed to update.
+ */
+async function markIssuesExported(issueKeys) {
+  const failures = [];
+  for (const issueKey of issueKeys) {
     try {
-      await jiraService.markIssueExported(issue.key);
+      await jiraService.markIssueExported(issueKey);
     } catch (err) {
-      console.error(`Failed to update Jira issue ${issue.key}:`, err.message);
+      const detail = err.response?.data ? JSON.stringify(err.response.data) : err.message;
+      console.error(`Failed to update Jira issue ${issueKey}:`, detail);
+      failures.push(issueKey);
     }
   }
-
-  return invoice;
+  return failures;
 }
 
 /**
@@ -148,13 +159,7 @@ async function markInvoiceIssuesExported(invoice) {
   const issueKeys = Array.from(
     new Set((invoice.lineItems || []).map((item) => item.issueKey).filter(Boolean))
   );
-  for (const issueKey of issueKeys) {
-    try {
-      await jiraService.markIssueExported(issueKey);
-    } catch (err) {
-      console.error(`Failed to update Jira issue ${issueKey}:`, err.message);
-    }
-  }
+  return markIssuesExported(issueKeys);
 }
 
 async function getPdfBuffer(invoiceId) {
@@ -178,6 +183,19 @@ async function sendInvoiceEmail(invoiceId) {
   return { sent: true, to: emails };
 }
 
+/**
+ * Recipients, subject, and body for emailing an invoice from the user's own mail app.
+ */
+async function getEmailContent(invoiceId) {
+  const invoice = await findById(invoiceId);
+  const to = emailService.parseBillingEmails(invoice.client?.billingEmail);
+  if (to.length === 0) {
+    throw new Error('This client has no billing emails set. Add one or more in Clients.');
+  }
+  const { subject, text } = emailService.buildInvoiceEmailContent(invoice);
+  return { to, subject, body: text };
+}
+
 async function updateStatus(id, status) {
   const allowed = ['draft', 'sent', 'paid'];
   if (!allowed.includes(status)) throw new Error('Invalid status');
@@ -197,5 +215,6 @@ module.exports = {
   getPdfBuffer,
   updateStatus,
   sendInvoiceEmail,
+  getEmailContent,
   existsForClientAndDateRange,
 };
