@@ -35,6 +35,13 @@ export default function GenerateInvoice() {
 
   const confirmGenerate = async () => {
     if (!clientId) return;
+    const issueCount = new Set(preview.lineItems.map((item) => item.issueKey)).size;
+    const ok = window.confirm(
+      `Generate this invoice for ${preview.client.name}?\n\n` +
+      `This will close out ${issueCount} Jira issue${issueCount === 1 ? '' : 's'} by setting "Time Exported" to Yes, ` +
+      `so they won't show up on future invoices.`
+    );
+    if (!ok) return;
     setGenerating(true);
     setError('');
     try {

@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 
 export default function InvoiceView() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [invoice, setInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [sending, setSending] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     api.invoices.get(id)
@@ -25,6 +27,22 @@ export default function InvoiceView() {
       alert(e.message);
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const deleteDraft = async () => {
+    const ok = window.confirm(
+      `Delete draft invoice #${invoice.id.slice(-8).toUpperCase()}?\n\n` +
+      `This permanently removes the invoice and sets "Time Exported" back to No on its Jira issues so they can be invoiced again.`
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await api.invoices.delete(id);
+      navigate('/invoices');
+    } catch (e) {
+      alert(e.message);
+      setDeleting(false);
     }
   };
 
@@ -80,6 +98,16 @@ export default function InvoiceView() {
           >
             {sending ? 'Opening…' : 'Email invoice'}
           </button>
+          {invoice.status === 'draft' && (
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={deleteDraft}
+              disabled={deleting}
+            >
+              {deleting ? 'Deleting…' : 'Delete draft'}
+            </button>
+          )}
           <Link to="/invoices" className="btn btn-secondary">Back to list</Link>
         </div>
       </div>

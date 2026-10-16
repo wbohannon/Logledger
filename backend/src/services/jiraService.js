@@ -160,17 +160,31 @@ function secondsToDecimalHours(seconds) {
 }
 
 /**
- * Mark issue as exported by setting "time exported[dropdown]" to "Yes".
+ * Set "time exported[dropdown]" on an issue to "Yes" or "No".
  */
-async function markIssueExported(issueKey) {
+async function setIssueTimeExported(issueKey, value) {
   const fieldId = await getTimeExportedFieldId();
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}/rest/api/3/issue/${issueKey}`;
   await axios.put(
     url,
-    { fields: { [fieldId]: { value: 'Yes' } } },
+    { fields: { [fieldId]: { value } } },
     { headers: { ...getAuthHeader(), 'Content-Type': 'application/json', Accept: 'application/json' } }
   );
+}
+
+/**
+ * Mark issue as exported by setting "time exported[dropdown]" to "Yes".
+ */
+async function markIssueExported(issueKey) {
+  await setIssueTimeExported(issueKey, 'Yes');
+}
+
+/**
+ * Mark issue as not exported by setting "time exported[dropdown]" back to "No".
+ */
+async function markIssueNotExported(issueKey) {
+  await setIssueTimeExported(issueKey, 'No');
 }
 
 /**
@@ -213,6 +227,7 @@ module.exports = {
   fetchWorklogs,
   secondsToDecimalHours,
   markIssueExported,
+  markIssueNotExported,
   aggregateWorklogsForInvoice,
   getBaseUrl,
 };

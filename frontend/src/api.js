@@ -35,5 +35,6 @@ export const api = {
     emailContent: (id) => request(`/invoices/${id}/email`),
     updateStatus: (id, status) =>
       request(`/invoices/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    delete: (id) => request(`/invoices/${id}`, { method: 'DELETE' }),
   },
 };

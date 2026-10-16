@@ -10,5 +10,6 @@ router.get('/:id/pdf', invoiceController.downloadPdf);
 router.post('/:id/send', invoiceController.sendEmail);
 router.get('/:id/email', invoiceController.emailContent);
 router.patch('/:id/status', invoiceController.updateStatus);
+router.delete('/:id', invoiceController.remove);
 
 module.exports = router;
