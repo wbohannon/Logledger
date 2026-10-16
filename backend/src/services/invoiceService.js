@@ -1,5 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
-const { NotFoundError } = require('../utils/errors');
+const { AppError, NotFoundError, ConflictError } = require('../utils/errors');
 const clientService = require('./clientService');
 const jiraService = require('./jiraService');
 const { generateInvoicePdf } = require('./pdfService');
@@ -129,15 +129,37 @@ async function generateInvoice(clientId) {
     include: { client: true, lineItems: true },
   });
 
-  for (const issue of issues) {
+  const jiraExportFailures = await markIssuesExported(issues.map((issue) => issue.key));
+
+  return { ...invoice, jiraExportFailures };
+}
+
+/**
+ * Set "time exported" = Yes on each Jira issue. Returns the keys that failed to update.
+ */
+async function markIssuesExported(issueKeys) {
+  return updateIssues(issueKeys, jiraService.markIssueExported);
+}
+
+/**
+ * Set "time exported" = No on each Jira issue. Returns the keys that failed to update.
+ */
+async function markIssuesNotExported(issueKeys) {
+  return updateIssues(issueKeys, jiraService.markIssueNotExported);
+}
+
+async function updateIssues(issueKeys, update) {
+  const failures = [];
+  for (const issueKey of issueKeys) {
     try {
-      await jiraService.markIssueExported(issue.key);
+      await update(issueKey);
     } catch (err) {
-      console.error(`Failed to update Jira issue ${issue.key}:`, err.message);
+      const detail = err.response?.data ? JSON.stringify(err.response.data) : err.message;
+      console.error(`Failed to update Jira issue ${issueKey}:`, detail);
+      failures.push(issueKey);
     }
   }
-
-  return invoice;
+  return failures;
 }
 
 /**
@@ -145,16 +167,32 @@ async function generateInvoice(clientId) {
  * Uses invoice line items to determine issue keys.
  */
 async function markInvoiceIssuesExported(invoice) {
-  const issueKeys = Array.from(
+  return markIssuesExported(getInvoiceIssueKeys(invoice));
+}
+
+function getInvoiceIssueKeys(invoice) {
+  return Array.from(
     new Set((invoice.lineItems || []).map((item) => item.issueKey).filter(Boolean))
   );
-  for (const issueKey of issueKeys) {
-    try {
-      await jiraService.markIssueExported(issueKey);
-    } catch (err) {
-      console.error(`Failed to update Jira issue ${issueKey}:`, err.message);
-    }
+}
+
+/**
+ * Delete a draft invoice and set its Jira issues back to "time exported" = No so they can be invoiced again.
+ * If any Jira issue fails to reset, the invoice is kept so the delete can be retried.
+ */
+async function deleteDraft(id) {
+  const invoice = await findById(id);
+  if (invoice.status !== 'draft') {
+    throw new ConflictError('Only draft invoices can be deleted');
   }
+  const failures = await markIssuesNotExported(getInvoiceIssueKeys(invoice));
+  if (failures.length > 0) {
+    throw new AppError(
+      `Could not reset "Time Exported" on Jira issues: ${failures.join(', ')}. The invoice was not deleted; try again.`,
+      502
+    );
+  }
+  await prisma.invoice.delete({ where: { id } });
 }
 
 async function getPdfBuffer(invoiceId) {
@@ -178,6 +216,19 @@ async function sendInvoiceEmail(invoiceId) {
   return { sent: true, to: emails };
 }
 
+/**
+ * Recipients, subject, and body for emailing an invoice from the user's own mail app.
+ */
+async function getEmailContent(invoiceId) {
+  const invoice = await findById(invoiceId);
+  const to = emailService.parseBillingEmails(invoice.client?.billingEmail);
+  if (to.length === 0) {
+    throw new Error('This client has no billing emails set. Add one or more in Clients.');
+  }
+  const { subject, text } = emailService.buildInvoiceEmailContent(invoice);
+  return { to, subject, body: text };
+}
+
 async function updateStatus(id, status) {
   const allowed = ['draft', 'sent', 'paid'];
   if (!allowed.includes(status)) throw new Error('Invalid status');
@@ -196,6 +247,8 @@ module.exports = {
   generateInvoice,
   getPdfBuffer,
   updateStatus,
+  deleteDraft,
   sendInvoiceEmail,
+  getEmailContent,
   existsForClientAndDateRange,
 };

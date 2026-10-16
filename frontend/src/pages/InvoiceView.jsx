@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 
 export default function InvoiceView() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [invoice, setInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [sending, setSending] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     api.invoices.get(id)
@@ -28,11 +30,36 @@ export default function InvoiceView() {
     }
   };
 
+  const deleteDraft = async () => {
+    const ok = window.confirm(
+      `Delete draft invoice #${invoice.id.slice(-8).toUpperCase()}?\n\n` +
+      `This permanently removes the invoice and sets "Time Exported" back to No on its Jira issues so they can be invoiced again.`
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await api.invoices.delete(id);
+      navigate('/invoices');
+    } catch (e) {
+      alert(e.message);
+      setDeleting(false);
+    }
+  };
+
+  // Downloads the PDF, then opens a new message in the default mail app with recipients, subject and body filled in.
+  // Browsers can't attach files to a mailto: message, so the PDF is dragged in from Downloads.
   const sendInvoiceEmail = async () => {
     setSending(true);
     try {
-      const result = await api.invoices.sendEmail(id);
-      alert(`Invoice sent to ${result.to?.join(', ') || 'recipients'}.`);
+      const { to, subject, body } = await api.invoices.emailContent(id);
+      const link = document.createElement('a');
+      link.href = api.invoices.pdfUrl(id);
+      link.download = '';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      const mailto = `mailto:${to.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      setTimeout(() => { window.location.href = mailto; }, 500);
     } catch (e) {
       alert(e.message);
     } finally {
@@ -69,8 +96,18 @@ export default function InvoiceView() {
             disabled={sending || !invoice.client?.billingEmail?.trim()}
             title={!invoice.client?.billingEmail?.trim() ? 'Add billing emails in Clients' : ''}
           >
-            {sending ? 'Sending…' : 'Email invoice'}
+            {sending ? 'Opening…' : 'Email invoice'}
           </button>
+          {invoice.status === 'draft' && (
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={deleteDraft}
+              disabled={deleting}
+            >
+              {deleting ? 'Deleting…' : 'Delete draft'}
+            </button>
+          )}
           <Link to="/invoices" className="btn btn-secondary">Back to list</Link>
         </div>
       </div>

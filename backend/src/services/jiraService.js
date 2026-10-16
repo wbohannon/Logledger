@@ -14,11 +14,24 @@ const getBaseUrl = () => {
   return base;
 };
 
+const TIME_EXPORTED_FIELD_NAME = 'Time Exported';
+let cachedTimeExportedFieldId = null;
+
 /**
- * Jira custom field id for "time exported[dropdown]". Set via JIRA_DOWNTIME_EXPORTED_FIELD_ID.
- * Used when marking issues as exported after invoice generation.
+ * Jira custom field id for "time exported[dropdown]". Uses JIRA_DOWNTIME_EXPORTED_FIELD_ID when set,
+ * otherwise looks the field up by name in Jira (cached). Used when marking issues as exported.
  */
-const getTimeExportedFieldId = () => process.env.JIRA_DOWNTIME_EXPORTED_FIELD_ID || '';
+async function getTimeExportedFieldId() {
+  if (process.env.JIRA_DOWNTIME_EXPORTED_FIELD_ID) return process.env.JIRA_DOWNTIME_EXPORTED_FIELD_ID;
+  if (cachedTimeExportedFieldId) return cachedTimeExportedFieldId;
+  const { data } = await axios.get(`${getBaseUrl()}/rest/api/3/field`, {
+    headers: { ...getAuthHeader(), Accept: 'application/json' },
+  });
+  const field = (data || []).find((f) => f.name?.toLowerCase() === TIME_EXPORTED_FIELD_NAME.toLowerCase());
+  if (!field) throw new Error(`Jira field "${TIME_EXPORTED_FIELD_NAME}" not found; set JIRA_DOWNTIME_EXPORTED_FIELD_ID`);
+  cachedTimeExportedFieldId = field.id;
+  return field.id;
+}
 const getEpicLinkFieldId = () => process.env.JIRA_EPIC_LINK_FIELD_ID || '';
 
 /**
@@ -147,21 +160,31 @@ function secondsToDecimalHours(seconds) {
 }
 
 /**
- * Mark issue as exported by setting "time exported[dropdown]" to "Yes".
+ * Set "time exported[dropdown]" on an issue to "Yes" or "No".
  */
-async function markIssueExported(issueKey) {
-  const fieldId = getTimeExportedFieldId();
-  if (!fieldId) {
-    console.warn('JIRA_DOWNTIME_EXPORTED_FIELD_ID not set; skipping Jira field update for', issueKey);
-    return;
-  }
+async function setIssueTimeExported(issueKey, value) {
+  const fieldId = await getTimeExportedFieldId();
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}/rest/api/3/issue/${issueKey}`;
   await axios.put(
     url,
-    { fields: { [fieldId]: { value: 'Yes' } } },
+    { fields: { [fieldId]: { value } } },
     { headers: { ...getAuthHeader(), 'Content-Type': 'application/json', Accept: 'application/json' } }
   );
+}
+
+/**
+ * Mark issue as exported by setting "time exported[dropdown]" to "Yes".
+ */
+async function markIssueExported(issueKey) {
+  await setIssueTimeExported(issueKey, 'Yes');
+}
+
+/**
+ * Mark issue as not exported by setting "time exported[dropdown]" back to "No".
+ */
+async function markIssueNotExported(issueKey) {
+  await setIssueTimeExported(issueKey, 'No');
 }
 
 /**
@@ -204,6 +227,7 @@ module.exports = {
   fetchWorklogs,
   secondsToDecimalHours,
   markIssueExported,
+  markIssueNotExported,
   aggregateWorklogsForInvoice,
   getBaseUrl,
 };
