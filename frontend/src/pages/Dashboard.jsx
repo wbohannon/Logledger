@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
+import Pagination, { usePagination } from '../components/Pagination';
+import MonthlyInvoicedChart from '../components/MonthlyInvoicedChart';
 
 export default function Dashboard() {
   const [clients, setClients] = useState([]);
@@ -18,7 +20,11 @@ export default function Dashboard() {
   }, []);
 
   const draftCount = invoices.filter((i) => i.status === 'draft').length;
-  const recentInvoices = invoices.slice(0, 5);
+  const outstanding = invoices
+    .filter((i) => i.status !== 'paid')
+    .reduce((sum, i) => sum + i.totalAmount, 0);
+  const paging = usePagination(invoices, 5);
+  const recentInvoices = paging.pageItems;
 
   if (loading) return <div className="page-header"><p>Loading…</p></div>;
 
@@ -28,7 +34,7 @@ export default function Dashboard() {
         <h1>Dashboard</h1>
         <p>Overview of clients and invoices</p>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
         <div className="card">
           <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem', color: 'var(--text-muted)' }}>Clients</h3>
           <p style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700 }}>{clients.length}</p>
@@ -44,8 +50,16 @@ export default function Dashboard() {
           <p style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700 }}>{draftCount}</p>
           <Link to="/generate" className="btn btn-primary btn-sm" style={{ marginTop: '0.75rem' }}>Generate</Link>
         </div>
+        <div className="card">
+          <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem', color: 'var(--text-muted)' }}>Outstanding</h3>
+          <p style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700 }}>${outstanding.toFixed(2)}</p>
+          <Link to="/invoices" className="btn btn-secondary btn-sm" style={{ marginTop: '0.75rem' }}>Draft &amp; sent</Link>
+        </div>
       </div>
       <div className="card" style={{ marginTop: '2rem' }}>
+        <MonthlyInvoicedChart invoices={invoices} />
+      </div>
+      <div className="card" style={{ marginTop: '1rem' }}>
         <h2 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem' }}>Recent invoices</h2>
         {recentInvoices.length === 0 ? (
           <p style={{ color: 'var(--text-muted)' }}>No invoices yet. Generate one from Jira worklogs.</p>
@@ -73,6 +87,7 @@ export default function Dashboard() {
             </tbody>
           </table>
         )}
+        <Pagination {...paging} />
       </div>
     </>
   );
