@@ -4,29 +4,37 @@ import { api } from '../api';
 
 const money = (n) => `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-function MonthlyGoalProgress({ progress, rate }) {
-  const pct = Math.min(100, (progress.projectedAmount / progress.goal) * 100);
+function GoalProgress({ progress, rate }) {
   const reached = progress.remainingAmount <= 0;
+  const since = progress.periodStart
+    ? `since last invoice sent ${new Date(progress.periodStart).toLocaleDateString()}`
+    : 'no invoice sent yet';
   return (
     <div style={{ margin: '1rem 0', padding: '0.85rem 1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, marginBottom: '0.5rem' }}>
-        <span>Monthly goal</span>
-        <span>{money(progress.projectedAmount)} / {money(progress.goal)}</span>
+        <span>Goal progress</span>
+        <span>{money(progress.amount)} / {money(progress.goal)} · {progress.percent}%</span>
       </div>
       <div style={{ height: '8px', background: 'var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: reached ? '#16a34a' : 'var(--accent)' }} />
+        <div style={{ width: `${Math.min(100, progress.percent)}%`, height: '100%', background: reached ? '#16a34a' : 'var(--accent)' }} />
       </div>
       <p style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>
         {reached
-          ? 'Goal reached for this month with this invoice.'
+          ? 'Goal reached for this billing period.'
           : <>
               <strong>{progress.remainingHours ?? '–'} more billable hrs</strong> at {money(rate)}/hr
               to reach the goal ({money(progress.remainingAmount)} to go).
             </>}
       </p>
       <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-        Already invoiced this month: {money(progress.invoicedThisMonth)} · This invoice: {money(progress.previewAmount)}
+        {progress.hours} unbilled hrs {since}.
+        {progress.carriedOverHours > 0 && <> {progress.carriedOverHours} unbilled hrs from before this period are on the invoice but not counted.</>}
       </p>
+      {progress.outstanding.count > 0 && (
+        <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          Outstanding (sent, unpaid): {progress.outstanding.count} invoice{progress.outstanding.count === 1 ? '' : 's'} · {money(progress.outstanding.amount)}. Not included in goal progress.
+        </p>
+      )}
     </div>
   );
 }
@@ -165,7 +173,7 @@ export default function GenerateInvoice() {
           <p style={{ marginTop: '1rem', fontWeight: 600 }}>
             Total: {preview.totalHours} hrs · ${Number(preview.totalAmount).toFixed(2)}
           </p>
-          {preview.monthlyGoal && <MonthlyGoalProgress progress={preview.monthlyGoal} rate={preview.client.hourlyRate} />}
+          {preview.monthlyGoal && <GoalProgress progress={preview.monthlyGoal} rate={preview.client.hourlyRate} />}
           <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
             Generating will create the invoice, save it, and mark the related Jira issues as exported.
           </p>

@@ -28,6 +28,7 @@ model Invoice {
   totalHours  Float
   totalAmount Float
   status      String   @default("draft") // draft, sent, paid
+  sentAt      DateTime?
   createdAt   DateTime @default(now())
   lineItems   InvoiceLineItem[]
 }

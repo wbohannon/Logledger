@@ -85,36 +85,61 @@ async function previewInvoice(clientId) {
     lineItems,
     totalHours,
     totalAmount,
-    monthlyGoal: await getMonthlyGoalProgress(client, totalAmount),
+    monthlyGoal: await getGoalProgress(client, issues, totalHours),
   };
 }
 
 /**
- * Progress toward the client's monthly goal: invoices already generated this calendar month
- * plus the previewed amount, and the billable hours (at the client's rate) still needed to hit the goal.
+ * Progress toward the client's goal for the current billing period.
+ * The period starts at the most recently sent invoice (not the calendar month, since invoices go out on
+ * irregular dates). Progress counts only unbilled worklogs (issues not yet on any invoice) started since then.
+ * Sent-but-unpaid invoices are reported separately as outstanding and never count toward progress.
  */
-async function getMonthlyGoalProgress(client, previewAmount) {
+async function getGoalProgress(client, issues, previewHours) {
   if (!client.monthlyGoal) return null;
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const { _sum } = await prisma.invoice.aggregate({
-    where: { clientId: client.id, createdAt: { gte: monthStart, lt: nextMonthStart } },
-    _sum: { totalAmount: true },
+  const lastSent = await prisma.invoice.findFirst({
+    where: { clientId: client.id, sentAt: { not: null } },
+    orderBy: { sentAt: 'desc' },
+    select: { sentAt: true },
   });
-  const invoicedThisMonth = _sum.totalAmount ?? 0;
-  const projectedAmount = Math.round((invoicedThisMonth + previewAmount) * 100) / 100;
-  const remainingAmount = Math.max(0, Math.round((client.monthlyGoal - projectedAmount) * 100) / 100);
+  const periodStart = lastSent?.sentAt ?? null;
+
+  let periodHours = previewHours;
+  if (periodStart) {
+    periodHours = 0;
+    for (const issue of issues) {
+      for (const w of issue.worklogs || []) {
+        if (w.started && new Date(w.started) >= periodStart) {
+          periodHours += jiraService.secondsToDecimalHours(w.timeSpentSeconds || 0);
+        }
+      }
+    }
+  }
+  periodHours = Math.round(periodHours * 100) / 100;
+  const carriedOverHours = Math.round((previewHours - periodHours) * 100) / 100;
+
+  const amount = Math.round(periodHours * client.hourlyRate * 100) / 100;
+  const remainingAmount = Math.max(0, Math.round((client.monthlyGoal - amount) * 100) / 100);
   const remainingHours = client.hourlyRate > 0
     ? Math.round((remainingAmount / client.hourlyRate) * 100) / 100
     : null;
+
+  const outstanding = await prisma.invoice.aggregate({
+    where: { clientId: client.id, status: 'sent' },
+    _sum: { totalAmount: true },
+    _count: true,
+  });
+
   return {
     goal: client.monthlyGoal,
-    invoicedThisMonth,
-    previewAmount,
-    projectedAmount,
+    periodStart,
+    hours: periodHours,
+    amount,
+    percent: Math.round((amount / client.monthlyGoal) * 1000) / 10,
     remainingAmount,
     remainingHours,
+    carriedOverHours,
+    outstanding: { count: outstanding._count, amount: outstanding._sum.totalAmount ?? 0 },
   };
 }
 
@@ -262,10 +287,12 @@ async function getEmailContent(invoiceId) {
 async function updateStatus(id, status) {
   const allowed = ['draft', 'sent', 'paid'];
   if (!allowed.includes(status)) throw new Error('Invalid status');
-  await findById(id);
+  const invoice = await findById(id);
+  // sentAt starts the next goal period; keep the original date if an invoice moves from sent to paid.
+  const sentAt = status === 'draft' ? null : invoice.sentAt ?? new Date();
   return prisma.invoice.update({
     where: { id },
-    data: { status },
+    data: { status, sentAt },
     include: { client: true, lineItems: true },
   });
 }

@@ -95,7 +95,7 @@ export default function ClientForm() {
               placeholder="e.g. 3000"
             />
             <p style={{ marginTop: '0.35rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Optional. The invoice preview will show how many more billable hours you need this month to reach it.
+              Optional. The invoice preview will show how many more billable hours you need this billing period (since the last invoice sent) to reach it.
             </p>
           </div>
           <div className="form-group">
