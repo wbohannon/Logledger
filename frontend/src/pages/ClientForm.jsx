@@ -13,6 +13,7 @@ export default function ClientForm() {
     hourlyRate: 75,
     jiraProjectKey: '',
     billingEmail: '',
+    monthlyGoal: '',
   });
 
   useEffect(() => {
@@ -23,6 +24,7 @@ export default function ClientForm() {
         hourlyRate: c.hourlyRate,
         jiraProjectKey: c.jiraProjectKey || '',
         billingEmail: c.billingEmail || '',
+        monthlyGoal: c.monthlyGoal ?? '',
       }))
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -37,6 +39,7 @@ export default function ClientForm() {
         hourlyRate: Number(form.hourlyRate),
         jiraProjectKey: form.jiraProjectKey || null,
         billingEmail: form.billingEmail || null,
+        monthlyGoal: form.monthlyGoal === '' ? null : Number(form.monthlyGoal),
       };
       if (isEdit) {
         await api.clients.update(id, payload);
@@ -80,6 +83,20 @@ export default function ClientForm() {
               onChange={(e) => setForm((f) => ({ ...f, hourlyRate: e.target.value }))}
               required
             />
+          </div>
+          <div className="form-group">
+            <label>Monthly goal ($)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.monthlyGoal}
+              onChange={(e) => setForm((f) => ({ ...f, monthlyGoal: e.target.value }))}
+              placeholder="e.g. 3000"
+            />
+            <p style={{ marginTop: '0.35rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Optional. The invoice preview will show how many more billable hours you need this month to reach it.
+            </p>
           </div>
           <div className="form-group">
             <label>Jira project key</label>

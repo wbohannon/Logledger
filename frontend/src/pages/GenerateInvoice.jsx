@@ -2,6 +2,35 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 
+const money = (n) => `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+function MonthlyGoalProgress({ progress, rate }) {
+  const pct = Math.min(100, (progress.projectedAmount / progress.goal) * 100);
+  const reached = progress.remainingAmount <= 0;
+  return (
+    <div style={{ margin: '1rem 0', padding: '0.85rem 1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, marginBottom: '0.5rem' }}>
+        <span>Monthly goal</span>
+        <span>{money(progress.projectedAmount)} / {money(progress.goal)}</span>
+      </div>
+      <div style={{ height: '8px', background: 'var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: reached ? '#16a34a' : 'var(--accent)' }} />
+      </div>
+      <p style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>
+        {reached
+          ? 'Goal reached for this month with this invoice.'
+          : <>
+              <strong>{progress.remainingHours ?? '–'} more billable hrs</strong> at {money(rate)}/hr
+              to reach the goal ({money(progress.remainingAmount)} to go).
+            </>}
+      </p>
+      <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+        Already invoiced this month: {money(progress.invoicedThisMonth)} · This invoice: {money(progress.previewAmount)}
+      </p>
+    </div>
+  );
+}
+
 export default function GenerateInvoice() {
   const [clients, setClients] = useState([]);
   const [clientId, setClientId] = useState('');
@@ -136,6 +165,7 @@ export default function GenerateInvoice() {
           <p style={{ marginTop: '1rem', fontWeight: 600 }}>
             Total: {preview.totalHours} hrs · ${Number(preview.totalAmount).toFixed(2)}
           </p>
+          {preview.monthlyGoal && <MonthlyGoalProgress progress={preview.monthlyGoal} rate={preview.client.hourlyRate} />}
           <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
             Generating will create the invoice, save it, and mark the related Jira issues as exported.
           </p>

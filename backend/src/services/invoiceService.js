@@ -85,6 +85,36 @@ async function previewInvoice(clientId) {
     lineItems,
     totalHours,
     totalAmount,
+    monthlyGoal: await getMonthlyGoalProgress(client, totalAmount),
+  };
+}
+
+/**
+ * Progress toward the client's monthly goal: invoices already generated this calendar month
+ * plus the previewed amount, and the billable hours (at the client's rate) still needed to hit the goal.
+ */
+async function getMonthlyGoalProgress(client, previewAmount) {
+  if (!client.monthlyGoal) return null;
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const { _sum } = await prisma.invoice.aggregate({
+    where: { clientId: client.id, createdAt: { gte: monthStart, lt: nextMonthStart } },
+    _sum: { totalAmount: true },
+  });
+  const invoicedThisMonth = _sum.totalAmount ?? 0;
+  const projectedAmount = Math.round((invoicedThisMonth + previewAmount) * 100) / 100;
+  const remainingAmount = Math.max(0, Math.round((client.monthlyGoal - projectedAmount) * 100) / 100);
+  const remainingHours = client.hourlyRate > 0
+    ? Math.round((remainingAmount / client.hourlyRate) * 100) / 100
+    : null;
+  return {
+    goal: client.monthlyGoal,
+    invoicedThisMonth,
+    previewAmount,
+    projectedAmount,
+    remainingAmount,
+    remainingHours,
   };
 }
 

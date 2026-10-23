@@ -20,6 +20,7 @@ async function create(data) {
       hourlyRate: data.hourlyRate,
       jiraProjectKey: data.jiraProjectKey ?? null,
       billingEmail: data.billingEmail ?? null,
+      monthlyGoal: data.monthlyGoal ?? null,
     },
   });
 }
@@ -33,6 +34,7 @@ async function update(id, data) {
       ...(data.hourlyRate != null && { hourlyRate: data.hourlyRate }),
       ...(data.jiraProjectKey !== undefined && { jiraProjectKey: data.jiraProjectKey || null }),
       ...(data.billingEmail !== undefined && { billingEmail: data.billingEmail || null }),
+      ...(data.monthlyGoal !== undefined && { monthlyGoal: data.monthlyGoal || null }),
     },
   });
 }
