@@ -85,17 +85,18 @@ async function previewInvoice(clientId) {
     lineItems,
     totalHours,
     totalAmount,
-    monthlyGoal: await getGoalProgress(client, issues, totalHours),
+    monthlyGoal: await getGoalProgress(client, totalHours, totalAmount),
   };
 }
 
 /**
  * Progress toward the client's goal for the current billing period.
  * The period starts at the most recently sent invoice (not the calendar month, since invoices go out on
- * irregular dates). Progress counts only unbilled worklogs (issues not yet on any invoice) started since then.
+ * irregular dates). Progress is the full preview: every unbilled worklog (issues not yet on any invoice)
+ * goes on the next invoice, even work dated before the last invoice was sent.
  * Sent-but-unpaid invoices are reported separately as outstanding and never count toward progress.
  */
-async function getGoalProgress(client, issues, previewHours) {
+async function getGoalProgress(client, hours, amount) {
   if (!client.monthlyGoal) return null;
   const lastSent = await prisma.invoice.findFirst({
     where: { clientId: client.id, sentAt: { not: null } },
@@ -104,21 +105,6 @@ async function getGoalProgress(client, issues, previewHours) {
   });
   const periodStart = lastSent?.sentAt ?? null;
 
-  let periodHours = previewHours;
-  if (periodStart) {
-    periodHours = 0;
-    for (const issue of issues) {
-      for (const w of issue.worklogs || []) {
-        if (w.started && new Date(w.started) >= periodStart) {
-          periodHours += jiraService.secondsToDecimalHours(w.timeSpentSeconds || 0);
-        }
-      }
-    }
-  }
-  periodHours = Math.round(periodHours * 100) / 100;
-  const carriedOverHours = Math.round((previewHours - periodHours) * 100) / 100;
-
-  const amount = Math.round(periodHours * client.hourlyRate * 100) / 100;
   const remainingAmount = Math.max(0, Math.round((client.monthlyGoal - amount) * 100) / 100);
   const remainingHours = client.hourlyRate > 0
     ? Math.round((remainingAmount / client.hourlyRate) * 100) / 100
@@ -133,12 +119,11 @@ async function getGoalProgress(client, issues, previewHours) {
   return {
     goal: client.monthlyGoal,
     periodStart,
-    hours: periodHours,
+    hours,
     amount,
     percent: Math.round((amount / client.monthlyGoal) * 1000) / 10,
     remainingAmount,
     remainingHours,
-    carriedOverHours,
     outstanding: { count: outstanding._count, amount: outstanding._sum.totalAmount ?? 0 },
   };
 }

@@ -28,7 +28,6 @@ function GoalProgress({ progress, rate }) {
       </p>
       <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
         {progress.hours} unbilled hrs {since}.
-        {progress.carriedOverHours > 0 && <> {progress.carriedOverHours} unbilled hrs from before this period are on the invoice but not counted.</>}
       </p>
       {progress.outstanding.count > 0 && (
         <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
