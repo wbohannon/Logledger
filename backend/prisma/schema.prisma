@@ -14,6 +14,7 @@ model Client {
   hourlyRate     Float
   jiraProjectKey String?
   billingEmail   String?
+  monthlyGoal    Float?
   createdAt      DateTime  @default(now())
   invoices       Invoice[]
 }
@@ -27,6 +28,7 @@ model Invoice {
   totalHours  Float
   totalAmount Float
   status      String   @default("draft") // draft, sent, paid
+  sentAt      DateTime?
   createdAt   DateTime @default(now())
   lineItems   InvoiceLineItem[]
 }

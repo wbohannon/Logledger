@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
+import Pagination, { usePagination } from '../components/Pagination';
+
+const PAGE_SIZE = 10;
 
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
@@ -23,6 +26,8 @@ export default function Invoices() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [filterClient, filterStatus]);
+
+  const paging = usePagination(invoices, PAGE_SIZE, `${filterClient}|${filterStatus}`);
 
   const updateInvoiceStatus = async (invoiceId, status) => {
     setUpdatingInvoiceId(invoiceId);
@@ -85,7 +90,7 @@ export default function Invoices() {
               </tr>
             </thead>
             <tbody>
-              {invoices.map((inv) => (
+              {paging.pageItems.map((inv) => (
                 <tr key={inv.id}>
                   <td>{inv.client?.name}</td>
                   <td>
@@ -115,6 +120,7 @@ export default function Invoices() {
             </tbody>
           </table>
         )}
+        <Pagination {...paging} />
       </div>
     </>
   );

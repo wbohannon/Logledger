@@ -8,6 +8,7 @@
   --accent-hover: #16a34a;
   --danger: #ef4444;
   --danger-hover: #dc2626;
+  --chart-bar: #16a34a;
   --radius: 8px;
   --font-sans: 'DM Sans', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -239,4 +240,96 @@ tr:hover td {
 .main {
   padding: 2rem 0;
   min-height: calc(100vh - 56px);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pagination-info {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.pagination .btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.chart-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.chart-wrap svg {
+  display: block;
+}
+
+.chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.chart-axis {
+  fill: var(--text-muted);
+  font-size: 11px;
+  font-family: var(--font-sans);
+}
+
+.chart-bar {
+  fill: var(--chart-bar);
+}
+
+.chart-hover-band {
+  fill: rgba(255, 255, 255, 0.04);
+}
+
+.chart-tooltip {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.chart-tooltip-title {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.chart-tooltip-value {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.chart-tooltip-meta {
+  color: var(--text-muted);
+  font-size: 0.75rem;
 }

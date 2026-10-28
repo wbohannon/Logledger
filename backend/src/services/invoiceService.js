@@ -85,6 +85,46 @@ async function previewInvoice(clientId) {
     lineItems,
     totalHours,
     totalAmount,
+    monthlyGoal: await getGoalProgress(client, totalHours, totalAmount),
+  };
+}
+
+/**
+ * Progress toward the client's goal for the current billing period.
+ * The period starts at the most recently sent invoice (not the calendar month, since invoices go out on
+ * irregular dates). Progress is the full preview: every unbilled worklog (issues not yet on any invoice)
+ * goes on the next invoice, even work dated before the last invoice was sent.
+ * Sent-but-unpaid invoices are reported separately as outstanding and never count toward progress.
+ */
+async function getGoalProgress(client, hours, amount) {
+  if (!client.monthlyGoal) return null;
+  const lastSent = await prisma.invoice.findFirst({
+    where: { clientId: client.id, sentAt: { not: null } },
+    orderBy: { sentAt: 'desc' },
+    select: { sentAt: true },
+  });
+  const periodStart = lastSent?.sentAt ?? null;
+
+  const remainingAmount = Math.max(0, Math.round((client.monthlyGoal - amount) * 100) / 100);
+  const remainingHours = client.hourlyRate > 0
+    ? Math.round((remainingAmount / client.hourlyRate) * 100) / 100
+    : null;
+
+  const outstanding = await prisma.invoice.aggregate({
+    where: { clientId: client.id, status: 'sent' },
+    _sum: { totalAmount: true },
+    _count: true,
+  });
+
+  return {
+    goal: client.monthlyGoal,
+    periodStart,
+    hours,
+    amount,
+    percent: Math.round((amount / client.monthlyGoal) * 1000) / 10,
+    remainingAmount,
+    remainingHours,
+    outstanding: { count: outstanding._count, amount: outstanding._sum.totalAmount ?? 0 },
   };
 }
 
@@ -232,10 +272,12 @@ async function getEmailContent(invoiceId) {
 async function updateStatus(id, status) {
   const allowed = ['draft', 'sent', 'paid'];
   if (!allowed.includes(status)) throw new Error('Invalid status');
-  await findById(id);
+  const invoice = await findById(id);
+  // sentAt starts the next goal period; keep the original date if an invoice moves from sent to paid.
+  const sentAt = status === 'draft' ? null : invoice.sentAt ?? new Date();
   return prisma.invoice.update({
     where: { id },
-    data: { status },
+    data: { status, sentAt },
     include: { client: true, lineItems: true },
   });
 }
